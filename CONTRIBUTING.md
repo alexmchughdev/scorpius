@@ -8,7 +8,7 @@ pull request.
 
 Requirements:
 
-- Go 1.22 or later
+- Go 1.23 or later
 - `staticcheck` (`go install honnef.co/go/tools/cmd/staticcheck@latest`)
 - Linux with `iproute2` (`tc`) available for integration tests
 - Root, or a user namespace with `CAP_NET_ADMIN`, for integration tests

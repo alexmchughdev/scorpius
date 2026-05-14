@@ -23,7 +23,7 @@ switch watchdog, abort conditions, a dry-run mode, and verified reversion.
 
 ### Build from source
 
-Requires Go 1.22 or later.
+Requires Go 1.23 or later.
 
 ```
 git clone https://github.com/alexmchughdev/scorpius.git
