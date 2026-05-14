@@ -28,3 +28,9 @@ updates:
     labels:
       - dependencies
       - github-actions
+    # Major version updates need manual review; the SHA-pinning interaction
+    # makes Dependabot suggest moving across major boundaries on every run.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
