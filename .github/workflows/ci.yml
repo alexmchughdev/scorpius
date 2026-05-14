@@ -10,15 +10,15 @@ permissions:
 
 jobs:
   test:
-    name: vet, staticcheck, test
+    name: vet, staticcheck, test, govulncheck
     runs-on: ubuntu-latest
     strategy:
       matrix:
         go: ['1.22']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
         with:
           go-version: ${{ matrix.go }}
           cache: true
@@ -31,6 +31,12 @@ jobs:
 
       - name: staticcheck
         run: staticcheck ./...
+
+      - name: install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+
+      - name: govulncheck
+        run: govulncheck ./...
 
       - name: go test
         run: go test -race -count=1 ./...
@@ -47,9 +53,9 @@ jobs:
           - goos: linux
             goarch: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
         with:
           go-version: '1.22'
           cache: true
@@ -64,7 +70,7 @@ jobs:
           go build -trimpath -ldflags="-s -w" -o "dist/scorpius-${GOOS}-${GOARCH}" ./cmd/scorpius
 
       - name: artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: scorpius-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/scorpius-${{ matrix.goos }}-${{ matrix.goarch }}

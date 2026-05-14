@@ -23,7 +23,19 @@ var (
 	rootConfig    string
 )
 
-func newRootCmd() *cobra.Command {
+// ExecuteOption configures Execute.
+type ExecuteOption func(*executeOptions)
+
+type executeOptions struct {
+	version string
+}
+
+// WithVersion sets the version string surfaced via `scorpius --version`.
+func WithVersion(v string) ExecuteOption {
+	return func(o *executeOptions) { o.version = v }
+}
+
+func newRootCmd(opts executeOptions) *cobra.Command {
 	rootVerbosity = 0
 	rootOutput = OutputText
 	rootConfig = ""
@@ -32,6 +44,7 @@ func newRootCmd() *cobra.Command {
 		Use:           "scorpius",
 		Short:         "Linux chaos engineering toolkit",
 		Long:          "scorpius injects controlled failures into Linux services and reverts them safely.",
+		Version:       opts.version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -49,8 +62,12 @@ func newRootCmd() *cobra.Command {
 
 // Execute runs scorpius with the given args (typically os.Args[1:]) and
 // returns a Unix-style exit code. It writes errors to os.Stderr.
-func Execute(args []string) int {
-	cmd := newRootCmd()
+func Execute(args []string, opts ...ExecuteOption) int {
+	o := executeOptions{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+	cmd := newRootCmd(o)
 	cmd.SetArgs(args)
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
