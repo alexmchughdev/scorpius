@@ -128,6 +128,108 @@ func TestInjectNetworkLatencyRejectsMissingFlags(t *testing.T) {
 	}
 }
 
+func TestInjectNetworkPacketLossDryRun(t *testing.T) {
+	stdout, _ := capture(t, func() {
+		code := cli.Execute([]string{
+			"inject", "network-packet-loss",
+			"--interface", "lo",
+			"--loss", "5",
+			"--correlation", "25",
+			"--duration", "10s",
+			"--dry-run",
+		})
+		require.Zero(t, code)
+	})
+
+	assert.Contains(t, stdout, "network_packet_loss")
+	assert.Contains(t, stdout, "tc qdisc add dev lo root netem loss 5% 25%")
+	assert.Contains(t, stdout, "tc qdisc del dev lo root")
+}
+
+func TestInjectNetworkPacketLossDryRunWithoutCorrelation(t *testing.T) {
+	stdout, _ := capture(t, func() {
+		code := cli.Execute([]string{
+			"inject", "network-packet-loss",
+			"--interface", "lo",
+			"--loss", "0.5",
+			"--duration", "10s",
+			"--dry-run",
+		})
+		require.Zero(t, code)
+	})
+
+	assert.Contains(t, stdout, "tc qdisc add dev lo root netem loss 0.5%")
+}
+
+func TestInjectNetworkPacketLossDryRunJSON(t *testing.T) {
+	stdout, _ := capture(t, func() {
+		code := cli.Execute([]string{
+			"inject", "network-packet-loss",
+			"--interface", "lo",
+			"--loss", "5",
+			"--duration", "10s",
+			"--dry-run",
+			"--output", "json",
+		})
+		require.Zero(t, code)
+	})
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	assert.Equal(t, "network_packet_loss", got["kind"])
+}
+
+func TestInjectNetworkPacketLossRejectsBadFlags(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "missing interface",
+			args: []string{"inject", "network-packet-loss", "--loss", "5", "--duration", "1s", "--dry-run"},
+			want: "--interface is required",
+		},
+		{
+			name: "missing loss",
+			args: []string{"inject", "network-packet-loss", "--interface", "lo", "--duration", "1s", "--dry-run"},
+			want: "--loss must be positive",
+		},
+		{
+			name: "loss over 100",
+			args: []string{"inject", "network-packet-loss", "--interface", "lo", "--loss", "150", "--duration", "1s", "--dry-run"},
+			want: "--loss must be <= 100",
+		},
+		{
+			name: "negative correlation",
+			args: []string{"inject", "network-packet-loss", "--interface", "lo", "--loss", "5", "--correlation", "-1", "--duration", "1s", "--dry-run"},
+			want: "--correlation must be non-negative",
+		},
+		{
+			name: "duration exceeds max",
+			args: []string{
+				"inject", "network-packet-loss",
+				"--interface", "lo",
+				"--loss", "5",
+				"--duration", "2h",
+				"--max-duration", "1h",
+				"--dry-run",
+			},
+			want: "exceeds --max-duration",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, errOut := capture(t, func() {
+				code := cli.Execute(c.args)
+				assert.NotZero(t, code)
+			})
+			assert.Contains(t, errOut, c.want)
+		})
+	}
+}
+
 // capture redirects os.Stdout and os.Stderr through pipes for the duration
 // of fn and returns whatever was written to each.
 func capture(t *testing.T, fn func()) (stdout, stderr string) {
