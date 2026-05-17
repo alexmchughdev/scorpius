@@ -230,6 +230,116 @@ func TestInjectNetworkPacketLossRejectsBadFlags(t *testing.T) {
 	}
 }
 
+func TestInjectNetworkPartitionDryRun(t *testing.T) {
+	stdout, _ := capture(t, func() {
+		code := cli.Execute([]string{
+			"inject", "network-partition",
+			"--address", "10.0.0.5",
+			"--protocol", "tcp",
+			"--port", "5432",
+			"--duration", "10s",
+			"--dry-run",
+		})
+		require.Zero(t, code)
+	})
+
+	assert.Contains(t, stdout, "network_partition")
+	assert.Contains(t, stdout, "SCORPIUS_PART_")
+	assert.Contains(t, stdout, "-d 10.0.0.5 -p tcp --dport 5432 -j DROP")
+	assert.Contains(t, stdout, "-s 10.0.0.5 -p tcp --sport 5432 -j DROP")
+	assert.Contains(t, stdout, "-I OUTPUT 1 -j SCORPIUS_PART_")
+	assert.Contains(t, stdout, "-I INPUT 1 -j SCORPIUS_PART_")
+}
+
+func TestInjectNetworkPartitionDryRunCIDR(t *testing.T) {
+	stdout, _ := capture(t, func() {
+		code := cli.Execute([]string{
+			"inject", "network-partition",
+			"--address", "10.0.0.0/24",
+			"--direction", "out",
+			"--duration", "10s",
+			"--dry-run",
+		})
+		require.Zero(t, code)
+	})
+
+	assert.Contains(t, stdout, "-d 10.0.0.0/24 -j DROP")
+	assert.Contains(t, stdout, "-I OUTPUT 1 -j SCORPIUS_PART_")
+	assert.NotContains(t, stdout, "-I INPUT 1 -j SCORPIUS_PART_")
+}
+
+func TestInjectNetworkPartitionDryRunJSON(t *testing.T) {
+	stdout, _ := capture(t, func() {
+		code := cli.Execute([]string{
+			"inject", "network-partition",
+			"--address", "10.0.0.5",
+			"--duration", "10s",
+			"--dry-run",
+			"--output", "json",
+		})
+		require.Zero(t, code)
+	})
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	assert.Equal(t, "network_partition", got["kind"])
+}
+
+func TestInjectNetworkPartitionRejectsBadFlags(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "missing address",
+			args: []string{"inject", "network-partition", "--duration", "1s", "--dry-run"},
+			want: "--address is required",
+		},
+		{
+			name: "bad address",
+			args: []string{"inject", "network-partition", "--address", "not-an-ip", "--duration", "1s", "--dry-run"},
+			want: "invalid IP",
+		},
+		{
+			name: "ipv6 address",
+			args: []string{"inject", "network-partition", "--address", "2001:db8::1", "--duration", "1s", "--dry-run"},
+			want: "IPv4",
+		},
+		{
+			name: "port without protocol",
+			args: []string{"inject", "network-partition", "--address", "10.0.0.5", "--port", "80", "--duration", "1s", "--dry-run"},
+			want: "port requires protocol",
+		},
+		{
+			name: "bad direction",
+			args: []string{"inject", "network-partition", "--address", "10.0.0.5", "--direction", "sideways", "--duration", "1s", "--dry-run"},
+			want: "direction",
+		},
+		{
+			name: "duration exceeds max",
+			args: []string{
+				"inject", "network-partition",
+				"--address", "10.0.0.5",
+				"--duration", "2h",
+				"--max-duration", "1h",
+				"--dry-run",
+			},
+			want: "exceeds --max-duration",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, errOut := capture(t, func() {
+				code := cli.Execute(c.args)
+				assert.NotZero(t, code)
+			})
+			assert.Contains(t, errOut, c.want)
+		})
+	}
+}
+
 // capture redirects os.Stdout and os.Stderr through pipes for the duration
 // of fn and returns whatever was written to each.
 func capture(t *testing.T, fn func()) (stdout, stderr string) {
