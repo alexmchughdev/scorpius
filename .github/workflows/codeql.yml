@@ -33,7 +33,7 @@ jobs:
           cache: true
 
       - name: initialize CodeQL
-        uses: github/codeql-action/init@7fd177fa680c9881b53cdab4d346d32574c9f7f4  # v3
+        uses: github/codeql-action/init@dd903d2e4f5405488e5ef1422510ee31c8b32357  # v3
         with:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
